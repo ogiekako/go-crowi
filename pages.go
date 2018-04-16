@@ -108,7 +108,7 @@ type PageInfo struct {
 	CommentCount   int           `json:"commentCount"`
 	SeenUsers      []interface{} `json:"seenUsers"`
 	Liker          []interface{} `json:"liker"`
-	GrantedUsers   []string      `json:"grantedUsers"`
+	GrantedUsers   []interface{} `json:"grantedUsers"`
 	Grant          int           `json:"grant"`
 	Status         string        `json:"status"`
 	Extended       PageExtended  `json:"extended,omitempty"`
