@@ -1,6 +1,7 @@
 package crowi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,16 +26,20 @@ func (s *PagesService) Create(ctx context.Context, path, body string) (*Page, er
 	if err != nil {
 		return nil, err
 	}
+	if err := fillPageInfo(&page.Page); err != nil {
+		return nil, err
+	}
 	return &page, nil
 }
 
 // Update updates the page content. A page_id is necessary to know which
 // page should be updated.
-func (s *PagesService) Update(ctx context.Context, id, body string) (*Page, error) {
+func (s *PagesService) Update(ctx context.Context, id, revisionID, body string) (*Page, error) {
 	var page Page
 	params := url.Values{}
 	params.Set("access_token", s.client.config.Token)
 	params.Set("page_id", id)
+	params.Set("revision_id", revisionID)
 	params.Set("body", body)
 	err := s.client.newRequest(ctx, http.MethodPost, "/_api/pages.update", params, &page)
 	if err != nil {
@@ -72,6 +77,13 @@ func (s *PagesService) List(ctx context.Context, path, user string, opt *PagesLi
 			p = append(p, pages.Pages...)
 			offset += 50
 		}
+
+		for i := range p {
+			if err := fillPageInfo(&p[i]); err != nil {
+				return nil, err
+			}
+		}
+
 		pages.Pages = p
 	}
 	return &pages, nil
@@ -86,7 +98,21 @@ func (s *PagesService) Get(ctx context.Context, path string) (*Page, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := fillPageInfo(&page.Page); err != nil {
+		return &page, err
+	}
 	return &page, nil
+}
+
+func fillPageInfo(p *PageInfo) error {
+	if p.RawRevision == nil {
+		return nil
+	}
+	if err := json.Unmarshal(p.RawRevision, &p.Revision); err == nil {
+		p.RevisionID = p.Revision.ID
+		return nil
+	}
+	return json.Unmarshal(p.RawRevision, &p.RevisionID)
 }
 
 type Page struct {
@@ -96,22 +122,24 @@ type Page struct {
 }
 
 type PageInfo struct {
-	Revision       PageRevision  `json:"revision"`
-	V              int           `json:"__v"`
-	RedirectTo     interface{}   `json:"redirectTo"`
-	UpdatedAt      time.Time     `json:"updatedAt"`
-	LastUpdateUser interface{}   `json:"lastUpdateUser"`
-	Creator        interface{}   `json:"creator"`
-	Path           string        `json:"path"`
-	ID             string        `json:"_id"`
-	CreatedAt      time.Time     `json:"createdAt"`
-	CommentCount   int           `json:"commentCount"`
-	SeenUsers      []interface{} `json:"seenUsers"`
-	Liker          []interface{} `json:"liker"`
-	GrantedUsers   []interface{} `json:"grantedUsers"`
-	Grant          int           `json:"grant"`
-	Status         string        `json:"status"`
-	Extended       PageExtended  `json:"extended,omitempty"`
+	RawRevision    json.RawMessage `json:"revision"`
+	RevisionID     string          `json:"-"`
+	Revision       PageRevision    `json:"-"`
+	V              int             `json:"__v"`
+	RedirectTo     interface{}     `json:"redirectTo"`
+	UpdatedAt      time.Time       `json:"updatedAt"`
+	LastUpdateUser interface{}     `json:"lastUpdateUser"`
+	Creator        interface{}     `json:"creator"`
+	Path           string          `json:"path"`
+	ID             string          `json:"_id"`
+	CreatedAt      time.Time       `json:"createdAt"`
+	CommentCount   int             `json:"commentCount"`
+	SeenUsers      []interface{}   `json:"seenUsers"`
+	Liker          []interface{}   `json:"liker"`
+	GrantedUsers   []interface{}   `json:"grantedUsers"`
+	Grant          int             `json:"grant"`
+	Status         string          `json:"status"`
+	Extended       PageExtended    `json:"extended,omitempty"`
 }
 
 type PageRevision struct {
